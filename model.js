@@ -4,7 +4,7 @@ var Base = require("./class");
 	
 		init:function(props){
 			this._props = props;
-			this.data = _props.data;
+			//this.data = this.props("data");
 		},
 
 		props:function(name){
