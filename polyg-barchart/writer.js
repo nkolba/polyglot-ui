@@ -2,23 +2,41 @@ var Base = require("../writer.js");
 
 module.exports =  Base.extend({
 
+
+
 	routes:function(){
+		var margin,
+		width,
+		height;
 
 		return {
 			"!default":function(model){
-				var t = d3.select(model.props("target"));
+				var t = d3.select(model.target());
 
-				var margin = model.margins(),//{top: 20, right: 20, bottom: 30, left: 40},
-			    width = model.width() - (margin.left - margin.right),
-			    height = model.height() - (margin.top - margin.bottom),
-			    x = model.x(),
+				margin = model.margins();//{top: 20, right: 20, bottom: 30, left: 40},
+			    width = model.width() - (margin.left - margin.right);
+			    height = model.height() - (margin.top - margin.bottom);
+
+			   	var svg = d3.select(model.target()).selectAll("svg").data(["default"]);
+
+			   	svg.enter().append("svg");
+
+			   	svg.exit().remove();
+			   	
+			   	svg
+				    .attr("width", width + margin.left + margin.right)
+				    .attr("height", height + margin.top + margin.bottom)
+				  .append("g")
+				    .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+				return svg;
+
+			},
+
+			"data":function(model,svg){
+				var x = model.x(),
 			    y = model.y();
 
-			/*	var x = d3.scale.ordinal()
-				    .rangeRoundBands([margin.left, width], .1);
-
-				var y = d3.scale.linear()
-				    .range([height, 0]);*/
 
 				var xAxis = d3.svg.axis()
 				    .scale(x)
@@ -28,18 +46,6 @@ module.exports =  Base.extend({
 				    .scale(y)
 				    .orient("left")
 				    .ticks(10, "%");
-
-				var svg = d3.select(model.target()).selectAll("svg").data([model.data()]);
-
-				svg.enter().append("svg");
-
-				svg.exit().remove();
-
-				svg
-				    .attr("width", width + margin.left + margin.right)
-				    .attr("height", height + margin.top + margin.bottom)
-				  .append("g")
-				    .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
 
 				var data = model.data();
 				//d3.tsv("data.tsv", type, function(error, data) {
@@ -120,13 +126,8 @@ module.exports =  Base.extend({
 				  		 .attr("height", function(d) { return height - y(d.frequency); });
 
 				  });
-				 
-				//});
+				 				
 
-				function type(d) {
-				  d.frequency = +d.frequency;
-				  return d;
-				}					
 			}
 		};
 	}

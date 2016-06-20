@@ -25,7 +25,7 @@ var Base = require("./class");
 			var self = this,
 				r = route;
 
-				if (route === "!error"){
+				if (r.indexOf("!error") > -1){
 					return new Promise(function(resolve,reject){
 						self.routes()["!error"].call(self);
 					});
@@ -39,8 +39,13 @@ var Base = require("./class");
 						var routes = self.routes(),
 							target = routes["!default"](model);
 
+
 						if (r){
-							routes[r.path](model,target,r.query);
+							r.forEach(function(rt){
+								if (routes[rt]){
+									routes[rt](model,target);
+								}
+							});
 						}
 						else {
 							Object.keys(routes).filter(function(k){return k.substr(0,1) !== "!";}).forEach(function(k){

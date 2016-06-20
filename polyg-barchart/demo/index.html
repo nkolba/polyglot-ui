@@ -4,7 +4,7 @@
 		<script src="../bundle.js"></script>
 	</head>
 	<body>
-		<polyg-barchart id="chart"></polyg-barchart>
+		<polyg-barchart id="chart" width="600" height="400"></polyg-barchart>
 		<div>
 			<a href="javascript:sortFreq()">Sort by Frequency</a>
 		</div>
@@ -14,18 +14,18 @@
 		</div>
 	</body>
 	<script>
+
 	function sortFreq(){
 		document.getElementById("chart").setAttribute("key","frequency");
 	}
 
-function sortAbc(){
+	function sortAbc(){
 		document.getElementById("chart").setAttribute("key","letter");
 	}	
 
 
 
-	 	var d = [
-			{letter:"A" ,frequency:.08167 },
+	 	var d = [{letter:"A" ,frequency:.08167 },
 			{letter:"B" ,frequency:.01492 },
 			{letter:"C" ,frequency:.02782 },
 			{letter:"D" ,frequency:.04253 },

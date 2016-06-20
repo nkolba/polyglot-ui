@@ -17,15 +17,15 @@ module.exports = Base.extend({
 
 
 	target:function(){
-		return this.props("target") || document.body;
+		return this.props("target") ? this.props("target").value :  document.body;
 	},
 
 	width:function(){
-		return this.props("width") || 960;
+		return this.props("width") ? Number.parseInt(this.props("width").value) : 960;
 	},
 
 	height : function(){
-		return this.props("height") || 500;
+		return this.props("height") ? Number.parseInt(this.props("height").value) : 500;
 	},
 
 	x : function(){ 
@@ -43,7 +43,7 @@ module.exports = Base.extend({
 	},
 
 	data: function(){
-		var d = this.props("data") ?  JSON.parse(this.props("data")) : [];
+		var d = this.props("data") ?  this.props("data").value : [];
 		var k = this.props("key");
 		if (k){
 			return sort(d,k);

@@ -10,6 +10,20 @@
 		component: webcomponent binding	
 
 *******************/
+/* 
+
+	need to make properties more structured in order to support proper routing off of property changes
+	(and better support type/etc)
+	so:
+
+	props:{
+		"prop":{type:String,
+			value:"foo",
+			route:"bar" //this determines route to use if property changes
+			}
+	}
+
+*/
 
 var Base = require("./class");
 
@@ -34,7 +48,7 @@ var Base = require("./class");
 		}
 	//parse route for special syntax into a structure w/path and query
 	//i.e. rows?id=12  or data?set=my 
-	function resolveRoute(route){
+	/*function resolveRoute(route){
 		if (! route){
 			return null;
 		}
@@ -48,6 +62,94 @@ var Base = require("./class");
 				r.query[nv[0]] = nv[1];
 		}
 		return r;
+
+	}*/
+	function keys(obj){
+		var r = [];
+		for (var k in obj){
+			r.push(k);
+		}
+		return r;
+	}
+
+
+	function diffModels(oldM, newM){
+		var diffs = [],
+			enters = [],
+			exits = [],
+			updates = [];
+		//compare properties of models, compile list of differences
+		var newProps = newM.props(),
+			oldProps = oldM.props(),
+ 			newKeys = keys(newProps),
+			oldKeys = keys(oldProps);
+		
+		//properties added in new...
+		newKeys.forEach(function(k){
+			if (oldKeys.indexOf(k) <0){
+				enters.push(k);
+			}
+		});
+
+		//properties deleted in new...
+		oldKeys.forEach(function(k){
+			if (newKeys.indexOf(k) <0){
+				exits.push(k);
+			}
+		});
+
+		//properties changes...
+		for (var i = 0; i < newKeys.length; i++){
+			var k = newKeys[i];
+			if (oldProps[k] && oldProps[k] !== newProps[k]){
+				updates.push(k);
+			}
+		}
+		diffs = diffs.concat(enters,exits,updates);
+		if (diffs.length === 0){
+			diffs = ["!default"];
+		}
+		console.log(diffs.join(","))
+		return diffs;
+	}
+
+
+	//compare models and determine route to take
+	function resolveRoute(poly, oldM, newM){
+		//if there isn't a previous model
+		if (!oldM ){
+			return ["!default"];
+		}
+
+		//or, find differences
+		var diffs = diffModels(oldM, newM);
+		var r = [];
+		var propKeys = Object.keys(poly.props());
+		diffs.forEach(function(d){
+			/*if (propKeys.indexOf(d) > -1){
+				r.push(d);
+			}*/
+			propKeys.forEach(function(k){
+				if (k === d){
+					r.push(d);
+				}
+				else if (poly.props(k).route && poly.props(k).route === d){
+					r.push(d);	
+				}
+			});
+
+			/*if (poly.props(d)){
+				var prop = poly.props(d);
+				if (prop.route){
+					r.push(prop.route)
+				}
+				else {
+					r.push(d);
+				}
+			}*/
+		});
+
+		return  r;
 
 	}
 
@@ -97,7 +199,11 @@ var Base = require("./class");
 		//init
 		init:function(config){
 			if (config){
-				this.__prp = mix({},config);
+
+				this.__prp = mix({
+					
+
+				},config);
 			}
 			this.update();
 		},
@@ -112,7 +218,6 @@ var Base = require("./class");
 				w;
 
 
-			//r = resolveRoute(route);
 
 			//mix updated values with props
 			if (obj){
@@ -129,8 +234,9 @@ var Base = require("./class");
 				
 		
 			if (w && model){
-				
-				w.write(model).then(function(data){
+				r = resolveRoute(this, this.lastModel, model);
+
+				w.write(model, r).then(function(data){
 				//to do: dynamically generate route depending on model change			
 				self.onWrite.call(self);
 										
@@ -145,6 +251,9 @@ var Base = require("./class");
 				});
 			}
 
+			//keep reference to the last model
+			this.lastModel = model;
+
 			return self;
 		},
 	
@@ -156,8 +265,18 @@ var Base = require("./class");
 		//		"mixin value" = single obj arg
 		//		"set values" = obj arg, true arg for overwrite
 		props:function(val, mod){
-			return getSet(this, "__prp", val, mod);
+			//return getSet(this, "__prp", val, mod);
+			if (!val && !mod){
+				return this.__prp;
+			}
+			if (val && typeof(mod) === "undefined") {
+				return this.__prp[val].value;
+			}
+			else {
+				this.__prp[val].value = mod;
+			}
 		},
+
 
 		
 		/* dictionary of events emitted by app

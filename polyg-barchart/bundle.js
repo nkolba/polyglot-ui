@@ -78,15 +78,21 @@ compWrapper.createdCallback = function() {
 	var props = {target:this};
 	var attrs = this.attributes;
 	for (var i = 0; i < attrs.length; i++){
-		props[attrs.item(i).name] = attrs.item(i).value;
+		var v = attrs.item(i).value;
+		props[attrs.item(i).name] = {value:v};
 	}
 
 	this.__obj = new construct(props);
 };
 
 compWrapper.attributeChangedCallback = function(name, oldVal, newVal){
+
 		var update = {};
-		update[name] = newVal;
+		//hack!
+		if (name === "data"){
+			newVal = JSON.parse(newVal);
+		}
+		update[name] = {value:newVal};
 		this.__obj.update(update);
 	};
 
@@ -120,9 +126,17 @@ module.exports = Base.extend({
 
 	writer:Writer,
 
-	init:function(config){
+	init:function(){
 
-		this._super(config);
+		this._super({
+			data:{value:null,type:Object},
+			height:{value:"300", type:Number},
+			width:{value:"500", type:Number},
+			"key":{type:String,
+				value:"",
+				route:"data"}
+
+		});
 
 	}
 
@@ -153,15 +167,15 @@ module.exports = Base.extend({
 
 
 	target:function(){
-		return this.props("target") || document.body;
+		return this.props("target") ? this.props("target").value :  document.body;
 	},
 
 	width:function(){
-		return this.props("width") || 960;
+		return this.props("width") ? Number.parseInt(this.props("width").value) : 960;
 	},
 
 	height : function(){
-		return this.props("height") || 500;
+		return this.props("height") ? Number.parseInt(this.props("height").value) : 500;
 	},
 
 	x : function(){ 
@@ -179,7 +193,7 @@ module.exports = Base.extend({
 	},
 
 	data: function(){
-		var d = this.props("data") ?  JSON.parse(this.props("data")) : [];
+		var d = this.props("data") ?  this.props("data").value : [];
 		var k = this.props("key");
 		if (k){
 			return sort(d,k);
@@ -195,23 +209,41 @@ var Base = require("../writer.js");
 
 module.exports =  Base.extend({
 
+
+
 	routes:function(){
+		var margin,
+		width,
+		height;
 
 		return {
 			"!default":function(model){
-				var t = d3.select(model.props("target"));
+				var t = d3.select(model.target());
 
-				var margin = model.margins(),//{top: 20, right: 20, bottom: 30, left: 40},
-			    width = model.width() - (margin.left - margin.right),
-			    height = model.height() - (margin.top - margin.bottom),
-			    x = model.x(),
+				margin = model.margins();//{top: 20, right: 20, bottom: 30, left: 40},
+			    width = model.width() - (margin.left - margin.right);
+			    height = model.height() - (margin.top - margin.bottom);
+
+			   	var svg = d3.select(model.target()).selectAll("svg").data(["default"]);
+
+			   	svg.enter().append("svg");
+
+			   	svg.exit().remove();
+			   	
+			   	svg
+				    .attr("width", width + margin.left + margin.right)
+				    .attr("height", height + margin.top + margin.bottom)
+				  .append("g")
+				    .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+				return svg;
+
+			},
+
+			"data":function(model,svg){
+				var x = model.x(),
 			    y = model.y();
 
-			/*	var x = d3.scale.ordinal()
-				    .rangeRoundBands([margin.left, width], .1);
-
-				var y = d3.scale.linear()
-				    .range([height, 0]);*/
 
 				var xAxis = d3.svg.axis()
 				    .scale(x)
@@ -221,18 +253,6 @@ module.exports =  Base.extend({
 				    .scale(y)
 				    .orient("left")
 				    .ticks(10, "%");
-
-				var svg = d3.select(model.target()).selectAll("svg").data([model.data()]);
-
-				svg.enter().append("svg");
-
-				svg.exit().remove();
-
-				svg
-				    .attr("width", width + margin.left + margin.right)
-				    .attr("height", height + margin.top + margin.bottom)
-				  .append("g")
-				    .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
 
 				var data = model.data();
 				//d3.tsv("data.tsv", type, function(error, data) {
@@ -313,13 +333,8 @@ module.exports =  Base.extend({
 				  		 .attr("height", function(d) { return height - y(d.frequency); });
 
 				  });
-				 
-				//});
+				 				
 
-				function type(d) {
-				  d.frequency = +d.frequency;
-				  return d;
-				}					
 			}
 		};
 	}
@@ -338,6 +353,20 @@ module.exports =  Base.extend({
 		component: webcomponent binding	
 
 *******************/
+/* 
+
+	need to make properties more structured in order to support proper routing off of property changes
+	(and better support type/etc)
+	so:
+
+	props:{
+		"prop":{type:String,
+			value:"foo",
+			route:"bar" //this determines route to use if property changes
+			}
+	}
+
+*/
 
 var Base = require("./class");
 
@@ -362,7 +391,7 @@ var Base = require("./class");
 		}
 	//parse route for special syntax into a structure w/path and query
 	//i.e. rows?id=12  or data?set=my 
-	function resolveRoute(route){
+	/*function resolveRoute(route){
 		if (! route){
 			return null;
 		}
@@ -376,6 +405,95 @@ var Base = require("./class");
 				r.query[nv[0]] = nv[1];
 		}
 		return r;
+
+	}*/
+	function keys(obj){
+		var r = [];
+		for (var k in obj){
+			r.push(k);
+		}
+		return r;
+	}
+
+
+	function diffModels(oldM, newM){
+		var diffs = [],
+			enters = [],
+			exits = [],
+			updates = [];
+		//compare properties of models, compile list of differences
+		var newProps = newM.props(),
+			oldProps = oldM.props(),
+ 			newKeys = keys(newProps),
+			oldKeys = keys(oldProps);
+		
+		//properties added in new...
+		newKeys.forEach(function(k){
+			if (oldKeys.indexOf(k) <0){
+				enters.push(k);
+			}
+		});
+
+		//properties deleted in new...
+		oldKeys.forEach(function(k){
+			if (newKeys.indexOf(k) <0){
+				exits.push(k);
+			}
+		});
+
+		//properties changes...
+		for (var i = 0; i < newKeys.length; i++){
+			var k = newKeys[i];
+			if (oldProps[k] && oldProps[k] !== newProps[k]){
+				updates.push(k);
+			}
+		}
+		diffs = diffs.concat(enters,exits,updates);
+		if (diffs.length === 0){
+			diffs = ["!default"];
+		}
+		console.log(diffs.join(","))
+		return diffs;
+	}
+
+
+	//compare models and determine route to take
+	function resolveRoute(poly, oldM, newM){
+		//if there isn't a previous model
+		if (!oldM ){
+			return ["!default"];
+		}
+
+		//or, find differences
+		var diffs = diffModels(oldM, newM);
+		var r = [];
+		var propKeys = Object.keys(poly.props());
+		debugger;
+		diffs.forEach(function(d){
+			/*if (propKeys.indexOf(d) > -1){
+				r.push(d);
+			}*/
+			propKeys.forEach(function(k){
+				if (k === d){
+					r.push(d);
+				}
+				else if (poly.props(k).route && poly.props(k).route === d){
+					r.push(d);	
+				}
+			});
+
+			/*if (poly.props(d)){
+				var prop = poly.props(d);
+				if (prop.route){
+					r.push(prop.route)
+				}
+				else {
+					r.push(d);
+				}
+			}*/
+		});
+
+		return  r;
 
 	}
 
@@ -425,7 +543,11 @@ var Base = require("./class");
 		//init
 		init:function(config){
 			if (config){
-				this.__prp = mix({},config);
+
+				this.__prp = mix({
+					
+
+				},config);
 			}
 			this.update();
 		},
@@ -440,7 +562,6 @@ var Base = require("./class");
 				w;
 
 
-			//r = resolveRoute(route);
 
 			//mix updated values with props
 			if (obj){
@@ -457,8 +578,9 @@ var Base = require("./class");
 				
 		
 			if (w && model){
-				
-				w.write(model).then(function(data){
+				r = resolveRoute(this, this.lastModel, model);
+
+				w.write(model, r).then(function(data){
 				//to do: dynamically generate route depending on model change			
 				self.onWrite.call(self);
 										
@@ -473,6 +595,9 @@ var Base = require("./class");
 				});
 			}
 
+			//keep reference to the last model
+			this.lastModel = model;
+
 			return self;
 		},
 	
@@ -484,8 +609,18 @@ var Base = require("./class");
 		//		"mixin value" = single obj arg
 		//		"set values" = obj arg, true arg for overwrite
 		props:function(val, mod){
-			return getSet(this, "__prp", val, mod);
+			//return getSet(this, "__prp", val, mod);
+			if (!val && !mod){
+				return this.__prp;
+			}
+			if (val && typeof(mod) === "undefined") {
+				return this.__prp[val].value;
+			}
+			else {
+				this.__prp[val].value = mod;
+			}
 		},
+
 
 		
 		/* dictionary of events emitted by app
@@ -532,7 +667,7 @@ var Base = require("./class");
 			var self = this,
 				r = route;
 
-				if (route === "!error"){
+				if (r.indexOf("!error") > -1){
 					return new Promise(function(resolve,reject){
 						self.routes()["!error"].call(self);
 					});
@@ -546,8 +681,13 @@ var Base = require("./class");
 						var routes = self.routes(),
 							target = routes["!default"](model);
 
+
 						if (r){
-							routes[r.path](model,target,r.query);
+							r.forEach(function(rt){
+								if (routes[rt]){
+									routes[rt](model,target);
+								}
+							});
 						}
 						else {
 							Object.keys(routes).filter(function(k){return k.substr(0,1) !== "!";}).forEach(function(k){

@@ -8,9 +8,17 @@ module.exports = Base.extend({
 
 	writer:Writer,
 
-	init:function(config){
+	init:function(){
 
-		this._super(config);
+		this._super({
+			data:{value:null,type:Object},
+			height:{value:"300", type:Number},
+			width:{value:"500", type:Number},
+			"key":{type:String,
+				value:"",
+				route:"data"}
+
+		});
 
 	}
 
